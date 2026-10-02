@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What were Q3 sales?</title>
+<meta name="description" content="Step through two agents answering the same finance question: one on raw files, one through a semantic layer.">
+<style>
+:root { --bg:#fbfbfa; --card:#fff; --ink:#1d2327; --muted:#5d666b; --faint:#9aa3a7; --line:#dfe3e5; --soft:#f1f4f4;
+  --accent:#127c7c; --accent-soft:#e2f1f0; --guess:#9a5b00; --guess-soft:#fbf0dc; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+@media (prefers-color-scheme: dark) { :root { --bg:#14181a; --card:#1b2023; --ink:#e6eaeb; --muted:#9aa4a8; --faint:#5f6a6e; --line:#2e363a;
+  --soft:#222a2d; --accent:#4fb9b3; --accent-soft:#173533; --guess:#e0a54a; --guess-soft:#3a2b12; } }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+main { max-width:900px; margin:0 auto; padding:32px 16px 48px; }
+h1 { font-family:Georgia,"Times New Roman",serif; font-size:34px; line-height:1.15; margin:0 0 6px; }
+.sub { color:var(--muted); margin:0 0 18px; }
+
+/* narration + controls */
+.bar { position:sticky; top:0; z-index:5; background:var(--bg); padding:10px 0 12px; }
+.narr { background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:12px 16px; }
+.narr .n { font-size:12px; letter-spacing:.12em; font-weight:700; color:var(--accent); text-transform:uppercase; }
+.narr p { margin:2px 0 0; min-height:3em; }
+.ctrl { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-top:10px; }
+.ctrl button { font:inherit; font-weight:600; border-radius:10px; padding:8px 14px; cursor:pointer; border:1.5px solid var(--line); background:var(--card); color:var(--ink); }
+.ctrl button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+.ctrl button:disabled { opacity:.35; cursor:not-allowed; }
+.ctrl button:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.dots { display:flex; gap:6px; margin-left:auto; }
+.dots i { width:9px; height:9px; border-radius:50%; background:var(--line); }
+.dots i.on { background:var(--accent); }
+
+/* lanes */
+.lanes { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:6px; }
+.lane { min-width:0; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+.lane h2 { font-size:12px; letter-spacing:.12em; text-transform:uppercase; margin:0; color:var(--muted); }
+.lane.sl h2 { color:var(--accent); }
+.agent { display:flex; align-items:center; gap:10px; }
+.bot { width:34px; height:34px; border-radius:50%; background:var(--soft); border:1.5px solid var(--line); display:grid; place-items:center; font-weight:700; font-size:13px; flex:none; }
+.ask { font-size:14px; background:var(--soft); border-radius:10px; padding:6px 10px; }
+.wire { height:16px; margin-left:16px; border-left:2px dashed var(--line); transition:border-color .3s; }
+.wire.live { border-color:var(--accent); }
+
+.files { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.file { overflow-wrap:anywhere; border:1.5px solid var(--line); border-radius:8px; padding:6px 7px; font-family:var(--mono); font-size:11.5px; color:var(--muted); background:var(--card); transition:all .3s; }
+.file small { display:block; font-family:inherit; color:var(--faint); }
+.file.read { border-color:var(--ink); color:var(--ink); }
+.file.pick { border-color:var(--guess); background:var(--guess-soft); color:var(--ink); }
+.files.locked .file { opacity:.45; border-style:dashed; }
+.lock { font-size:12px; color:var(--muted); margin-top:-4px; }
+
+.notes { display:flex; flex-direction:column; gap:6px; min-height:0; }
+.note { border-left:4px solid var(--guess); background:var(--guess-soft); border-radius:6px; padding:6px 9px; font-size:14px;
+  opacity:0; transform:translateX(-8px); transition:opacity .35s, transform .35s; display:none; }
+.note.show { display:block; }
+.note.in { opacity:1; transform:none; }
+.note b { color:var(--guess); font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; display:block; }
+
+.code { font-family:var(--mono); font-size:12.5px; background:var(--soft); border-radius:8px; padding:8px 10px; display:none; }
+.code.show { display:block; }
+.meter { height:6px; background:var(--line); border-radius:3px; margin-top:6px; overflow:hidden; }
+.meter i { display:block; height:100%; width:0; background:var(--guess); }
+
+.layer { border:2px solid var(--accent); border-radius:12px; padding:8px; display:flex; flex-direction:column; gap:6px; background:var(--card); }
+.layer > span { font-size:12px; font-weight:700; color:var(--accent); padding:0 4px; }
+.piece { border:1.5px solid var(--line); border-radius:8px; padding:6px 9px; transition:all .3s; }
+.piece .t { font-weight:600; font-size:14px; color:var(--faint); transition:color .3s; }
+.piece .d { font-size:13.5px; color:var(--muted); display:none; }
+.piece.done { border-color:var(--accent); }
+.piece.done .t { color:var(--ink); }
+.piece.now { border-color:var(--accent); background:var(--accent-soft); box-shadow:0 0 0 3px var(--accent-soft); }
+.piece.now .t, .piece.done .t { color:var(--ink); }
+.piece.now .d, .piece.done .d { display:block; }
+.piece code { font-family:var(--mono); font-size:12px; }
+
+.answer { border-radius:12px; padding:12px 14px; border:1.5px dashed var(--line); color:var(--faint); margin-top:auto; transition:all .3s; }
+.answer .num { font-size:30px; font-weight:700; line-height:1.15; font-variant-numeric:tabular-nums; }
+.answer.on { border-style:solid; color:var(--ink); }
+.lane.raw .answer.on { border-color:var(--guess); background:var(--guess-soft); }
+.lane.sl .answer.on { border-color:var(--accent); background:var(--accent-soft); }
+.answer .moved { color:var(--guess); }
+.whatif { display:none; margin-top:14px; background:var(--card); border:1.5px solid var(--line); border-radius:14px; padding:12px 16px; }
+.whatif.show { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.whatif button { font:inherit; font-weight:600; border-radius:10px; padding:8px 14px; cursor:pointer; border:1.5px solid var(--accent); background:var(--accent-soft); color:var(--ink); }
+footer { margin-top:24px; font-size:14px; color:var(--muted); }
+footer a { color:var(--accent); }
+@media (max-width:680px) { .lanes { grid-template-columns:1fr; } h1 { font-size:28px; } .narr p { min-height:4.5em; } }
+@media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>What were Q3 sales?</h1>
+  <p class="sub">Two AI agents get the same question about an invented company's quarter. One works from the raw files. One can only ask a semantic layer. Step through what each one does.</p>
+
+  <div class="bar">
+    <div class="narr" aria-live="polite"><div class="n" id="n"></div><p id="say"></p></div>
+    <div class="ctrl">
+      <button id="back" aria-label="Previous step">Back</button>
+      <button id="next" class="primary">Next</button>
+      <button id="restart">Start over</button>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+    </div>
+  </div>
+
+  <div class="lanes">
+    <div class="lane raw" id="raw">
+      <h2>Agent on the raw files <span style="text-transform:none;letter-spacing:0;font-weight:400">· run 1 of 3</span></h2>
+      <div class="agent"><div class="bot">AI</div><div class="ask">What were Q3 sales?</div></div>
+      <div class="wire" id="r-wire"></div>
+      <div class="files" id="r-files">
+        <div class="file" data-f="orders">orders.csv<small>order system</small></div>
+        <div class="file" data-f="ship">shipments.csv<small>warehouse</small></div>
+        <div class="file" data-f="inv">invoices.csv<small>ERP</small></div>
+      </div>
+      <div class="notes">
+        <div class="note" data-s="2"><b>Decision 1: what sales means</b>"Defined “sales” as recognized net revenue (invoices minus credit memos), since no definition was given."</div>
+        <div class="note" data-s="3"><b>Decision 2: which date counts</b>Counts each invoice on the invoice date.</div>
+        <div class="note" data-s="4"><b>Decision 3: marketplace orders</b>Counts them at our commission: "a judgment call that moves the answer by $500,000."</div>
+      </div>
+      <div class="code" id="r-code">Writes its own program. This run: <span id="lines">0</span> lines<div class="meter"><i id="meter"></i></div></div>
+      <div class="answer" id="r-ans"><div class="num">?</div><div>Answer</div></div>
+    </div>
+
+    <div class="lane sl" id="sl">
+      <h2>Agent on the semantic layer</h2>
+      <div class="agent"><div class="bot">AI</div><div class="ask">What were Q3 sales?</div></div>
+      <div class="wire" id="s-wire"></div>
+      <div class="layer">
+        <span>Semantic layer</span>
+        <div class="piece" data-s="2"><div class="t">Definitions</div><div class="d">"Sales" with no qualifier means net sales, a rule the CFO and Chief Merchant signed together. Net sales: what shipped in the quarter, net of returns, marketplace at our commission. Owner: CFO.</div></div>
+        <div class="piece" data-s="3"><div class="t">Dictionary</div><div class="d"><code>ship_date</code>: the date the carrier picked up the shipment. NOT the order date.</div></div>
+        <div class="piece" data-s="4"><div class="t">Ontology</div><div class="d">Each invoice ties to its line's shipment, matched on order number and line number.</div></div>
+        <div class="piece" data-s="5"><div class="t">Data</div><div class="d" id="s-data"></div></div>
+      </div>
+      <div class="files locked" id="s-files">
+        <div class="file">orders.csv</div><div class="file">shipments.csv</div><div class="file">invoices.csv</div>
+      </div>
+      <div class="lock">In our test the agent was told not to open these, and it didn't. In production you set that as a permission.</div>
+      <div class="answer" id="s-ans"><div class="num">?</div><div>Answer</div></div>
+    </div>
+  </div>
+
+  <div class="whatif" id="whatif">
+    <button id="lag" aria-pressed="false">Bill a week after shipping</button>
+    <span class="sub" style="margin:0" id="lag-say">Same orders, same shipments. Only the invoice dates move.</span>
+  </div>
+
+  <footer>Invented company and data. Net sales, demand, the gap, returns and the billing change are recomputed in your browser from the files the agents used. The decisions, quotes, $9.6M, $11.6M and line counts come from our test runs. <a href="https://medium.com/@brnthood">Medium</a> · <a href="https://github.com/bryanthood-wph">GitHub</a></footer>
+</main>
+<script>
+const DATA = {"orders":[{"order_id":"4391","line_id":"1","order_date":"2026-06-24","line_amount":"150000"},{"order_id":"4396","line_id":"1","order_date":"2026-06-27","line_amount":"250000"},{"order_id":"4402","line_id":"1","order_date":"2026-07-03","line_amount":"420000"},{"order_id":"4407","line_id":"1","order_date":"2026-07-09","line_amount":"615000"},{"order_id":"4411","line_id":"1","order_date":"2026-07-14","line_amount":"280000"},{"order_id":"4415","line_id":"1","order_date":"2026-07-18","line_amount":"335000"},{"order_id":"4419","line_id":"1","order_date":"2026-07-22","line_amount":"640000"},{"order_id":"4419","line_id":"2","order_date":"2026-07-22","line_amount":"250000"},{"order_id":"4423","line_id":"1","order_date":"2026-07-28","line_amount":"460000"},{"order_id":"4428","line_id":"1","order_date":"2026-08-04","line_amount":"725000"},{"order_id":"4431","line_id":"1","order_date":"2026-08-08","line_amount":"540000"},{"order_id":"4435","line_id":"1","order_date":"2026-08-12","line_amount":"195000"},{"order_id":"4439","line_id":"1","order_date":"2026-08-19","line_amount":"510000"},{"order_id":"4439","line_id":"2","order_date":"2026-08-19","line_amount":"300000"},{"order_id":"4443","line_id":"1","order_date":"2026-08-25","line_amount":"670000"},{"order_id":"4447","line_id":"1","order_date":"2026-08-29","line_amount":"385000"},{"order_id":"4451","line_id":"1","order_date":"2026-09-03","line_amount":"555000"},{"order_id":"4455","line_id":"1","order_date":"2026-09-09","line_amount":"240000"},{"order_id":"4459","line_id":"1","order_date":"2026-09-15","line_amount":"505000"},{"order_id":"4463","line_id":"1","order_date":"2026-09-19","line_amount":"350000"},{"order_id":"4409","line_id":"1","order_date":"2026-07-11","line_amount":"600000"},{"order_id":"4425","line_id":"1","order_date":"2026-07-30","line_amount":"550000"},{"order_id":"4441","line_id":"1","order_date":"2026-08-21","line_amount":"450000"},{"order_id":"4413","line_id":"1","order_date":"2026-07-16","line_amount":"260000"},{"order_id":"4433","line_id":"1","order_date":"2026-08-09","line_amount":"175000"},{"order_id":"4449","line_id":"1","order_date":"2026-09-01","line_amount":"275000"},{"order_id":"4417","line_id":"1","order_date":"2026-07-20","line_amount":"125000"},{"order_id":"4437","line_id":"1","order_date":"2026-08-15","line_amount":"200000"},{"order_id":"4453","line_id":"1","order_date":"2026-09-05","line_amount":"300000"},{"order_id":"4461","line_id":"1","order_date":"2026-09-17","line_amount":"480000"},{"order_id":"4465","line_id":"1","order_date":"2026-09-23","line_amount":"320000"},{"order_id":"4467","line_id":"1","order_date":"2026-09-25","line_amount":"210000"},{"order_id":"4469","line_id":"1","order_date":"2026-09-27","line_amount":"300000"},{"order_id":"4471","line_id":"1","order_date":"2026-09-29","line_amount":"90000"},{"order_id":"4471","line_id":"2","order_date":"2026-09-29","line_amount":"90000"}],"shipments":[{"order_id":"4391","line_id":"1","ship_date":"2026-07-02"},{"order_id":"4396","line_id":"1","ship_date":"2026-07-06"},{"order_id":"4402","line_id":"1","ship_date":"2026-07-08"},{"order_id":"4407","line_id":"1","ship_date":"2026-07-15"},{"order_id":"4409","line_id":"1","ship_date":"2026-07-17"},{"order_id":"4411","line_id":"1","ship_date":"2026-07-20"},{"order_id":"4417","line_id":"1","ship_date":"2026-07-23"},{"order_id":"4415","line_id":"1","ship_date":"2026-07-24"},{"order_id":"4419","line_id":"1","ship_date":"2026-07-30"},{"order_id":"4419","line_id":"2","ship_date":"2026-07-30"},{"order_id":"4423","line_id":"1","ship_date":"2026-08-04"},{"order_id":"4425","line_id":"1","ship_date":"2026-08-06"},{"order_id":"4428","line_id":"1","ship_date":"2026-08-11"},{"order_id":"4431","line_id":"1","ship_date":"2026-08-14"},{"order_id":"4435","line_id":"1","ship_date":"2026-08-18"},{"order_id":"4437","line_id":"1","ship_date":"2026-08-19"},{"order_id":"4439","line_id":"1","ship_date":"2026-08-26"},{"order_id":"4439","line_id":"2","ship_date":"2026-08-26"},{"order_id":"4441","line_id":"1","ship_date":"2026-08-28"},{"order_id":"4443","line_id":"1","ship_date":"2026-09-01"},{"order_id":"4447","line_id":"1","ship_date":"2026-09-05"},{"order_id":"4453","line_id":"1","ship_date":"2026-09-09"},{"order_id":"4451","line_id":"1","ship_date":"2026-09-10"},{"order_id":"4455","line_id":"1","ship_date":"2026-09-16"},{"order_id":"4459","line_id":"1","ship_date":"2026-09-22"},{"order_id":"4463","line_id":"1","ship_date":"2026-09-26"},{"order_id":"4461","line_id":"1","ship_date":"2026-10-01"},{"order_id":"4471","line_id":"1","ship_date":"2026-10-02"},{"order_id":"4465","line_id":"1","ship_date":"2026-10-04"}],"invoices":[{"doc_id":"INV-88401","doc_type":"invoice","doc_date":"2026-07-02","order_id":"4391","line_id":"1","amount":"150000"},{"doc_id":"INV-88402","doc_type":"invoice","doc_date":"2026-07-06","order_id":"4396","line_id":"1","amount":"250000"},{"doc_id":"INV-88403","doc_type":"invoice","doc_date":"2026-07-08","order_id":"4402","line_id":"1","amount":"420000"},{"doc_id":"INV-88404","doc_type":"invoice","doc_date":"2026-07-15","order_id":"4407","line_id":"1","amount":"615000"},{"doc_id":"INV-88405","doc_type":"invoice","doc_date":"2026-07-17","order_id":"4409","line_id":"1","amount":"600000"},{"doc_id":"INV-88406","doc_type":"invoice","doc_date":"2026-07-20","order_id":"4411","line_id":"1","amount":"280000"},{"doc_id":"INV-88407","doc_type":"invoice","doc_date":"2026-07-23","order_id":"4417","line_id":"1","amount":"25000"},{"doc_id":"INV-88408","doc_type":"invoice","doc_date":"2026-07-24","order_id":"4415","line_id":"1","amount":"335000"},{"doc_id":"CM-3101","doc_type":"credit_memo","doc_date":"2026-07-29","order_id":"4409","line_id":"1","amount":"300000"},{"doc_id":"INV-88409","doc_type":"invoice","doc_date":"2026-07-30","order_id":"4419","line_id":"1","amount":"640000"},{"doc_id":"INV-88410","doc_type":"invoice","doc_date":"2026-07-30","order_id":"4419","line_id":"2","amount":"250000"},{"doc_id":"INV-88411","doc_type":"invoice","doc_date":"2026-08-04","order_id":"4423","line_id":"1","amount":"460000"},{"doc_id":"INV-88412","doc_type":"invoice","doc_date":"2026-08-06","order_id":"4425","line_id":"1","amount":"550000"},{"doc_id":"INV-88413","doc_type":"invoice","doc_date":"2026-08-11","order_id":"4428","line_id":"1","amount":"725000"},{"doc_id":"INV-88414","doc_type":"invoice","doc_date":"2026-08-14","order_id":"4431","line_id":"1","amount":"540000"},{"doc_id":"INV-88415","doc_type":"invoice","doc_date":"2026-08-18","order_id":"4435","line_id":"1","amount":"195000"},{"doc_id":"INV-88416","doc_type":"invoice","doc_date":"2026-08-19","order_id":"4437","line_id":"1","amount":"40000"},{"doc_id":"CM-3102","doc_type":"credit_memo","doc_date":"2026-08-20","order_id":"4425","line_id":"1","amount":"400000"},{"doc_id":"INV-88417","doc_type":"invoice","doc_date":"2026-08-26","order_id":"4439","line_id":"1","amount":"510000"},{"doc_id":"INV-88418","doc_type":"invoice","doc_date":"2026-08-26","order_id":"4439","line_id":"2","amount":"300000"},{"doc_id":"INV-88419","doc_type":"invoice","doc_date":"2026-08-28","order_id":"4441","line_id":"1","amount":"450000"},{"doc_id":"INV-88420","doc_type":"invoice","doc_date":"2026-09-01","order_id":"4443","line_id":"1","amount":"670000"},{"doc_id":"INV-88421","doc_type":"invoice","doc_date":"2026-09-05","order_id":"4447","line_id":"1","amount":"385000"},{"doc_id":"INV-88422","doc_type":"invoice","doc_date":"2026-09-09","order_id":"4453","line_id":"1","amount":"60000"},{"doc_id":"INV-88423","doc_type":"invoice","doc_date":"2026-09-10","order_id":"4451","line_id":"1","amount":"555000"},{"doc_id":"CM-3103","doc_type":"credit_memo","doc_date":"2026-09-12","order_id":"4441","line_id":"1","amount":"300000"},{"doc_id":"INV-88424","doc_type":"invoice","doc_date":"2026-09-16","order_id":"4455","line_id":"1","amount":"240000"},{"doc_id":"INV-88425","doc_type":"invoice","doc_date":"2026-09-22","order_id":"4459","line_id":"1","amount":"505000"},{"doc_id":"INV-88426","doc_type":"invoice","doc_date":"2026-09-26","order_id":"4463","line_id":"1","amount":"350000"},{"doc_id":"INV-88427","doc_type":"invoice","doc_date":"2026-10-01","order_id":"4461","line_id":"1","amount":"480000"},{"doc_id":"INV-88428","doc_type":"invoice","doc_date":"2026-10-02","order_id":"4471","line_id":"1","amount":"90000"},{"doc_id":"INV-88429","doc_type":"invoice","doc_date":"2026-10-04","order_id":"4465","line_id":"1","amount":"320000"}]};
+(function () {
+  "use strict";
+  const S = DATA.shipments, I = DATA.invoices, O = DATA.orders, Q0 = "2026-07-01", Q1 = "2026-09-30";
+  const inQ = d => !!d && d >= Q0 && d <= Q1;
+  const plus = (d, n) => { const t = new Date(d + "T00:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+  const ship = r => S.find(s => s.order_id === r.order_id && s.line_id === r.line_id).ship_date;
+  const sum = (rows, f) => rows.reduce((a, r) => a + f(r), 0);
+  const M = n => "$" + (Math.round(n / 10000) / 100).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 2 }) + "M";
+  const K = n => "$" + Math.round(n / 1000).toLocaleString("en-US") + "K";
+  const inv = I.filter(i => i.doc_type === "invoice");
+  const returns = sum(I.filter(i => i.doc_type === "credit_memo" && inQ(i.doc_date)), i => +i.amount);
+  // Raw agents' recipe (from their code): invoices on the invoice date, less credit memos.
+  const raw = lag => sum(inv.filter(i => inQ(lag ? plus(ship(i), lag) : i.doc_date)), i => +i.amount) - returns;
+  // The net sales card: invoices on their line's ship date, less credit memos.
+  const billedOnShip = sum(inv.filter(i => inQ(ship(i))), i => +i.amount);
+  const net = billedOnShip - returns;
+  const demand = sum(O.filter(o => inQ(o.order_date)), o => +o.line_amount);
+  const LINES = 126; // raw-1's saved code, non-blank non-comment lines (runs ranged 108 to 126)
+
+  document.getElementById("s-data").textContent = `Runs the card's stored query: ${M(billedOnShip)} invoiced on Q3 ship dates, less ${M(returns)} in returns.`;
+
+  const STEPS = [
+    "Same question, same data underneath. The only difference is what each agent is allowed to touch.",
+    "Raw files: the agent has to decide what \"sales\" means. Nobody told it, so it builds the number from the invoice file. Semantic layer: it starts from a definition somebody already signed.",
+    "Raw files: the agent picks a date on its own. Semantic layer: the dictionary spells out what each date field holds. The ship date is the day the carrier picked it up, not the order date.",
+    "Raw files: the agent makes a $500K judgment call itself. It said so only because our test asked it to list its decisions. Semantic layer: the ontology ties each invoice to the shipment of its own line, so it counts on the day that line shipped.",
+    `Raw files: the agent writes new code nobody has reviewed. Our three runs wrote 108 to 126 lines each. Semantic layer: the layer runs the card's stored query, the same every time. The agent writes no code.`,
+    `Both say ${M(net)}. Only the semantic-layer agent says whose number it is and puts the Chief Merchant's ${M(demand)} beside it.`,
+    "The raw-files agent got the right number by luck: in these files every invoice is dated the day it shipped. Change that one thing and watch.",
+  ];
+  const TITLES = ["The question", "What does \"sales\" mean?", "Which date counts?", "How do the records tie?", "Do the math", "The answer", "Now change one thing"];
+
+  let step = 0, lagOn = false, anim = null;
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const dots = document.getElementById("dots");
+  STEPS.forEach(() => dots.appendChild(document.createElement("i")));
+
+  function countLines(animate) {
+    cancelAnimationFrame(anim);
+    const el = document.getElementById("lines"), bar = document.getElementById("meter");
+    if (!animate || reduce) { el.textContent = LINES; bar.style.width = "100%"; return; }
+    const t0 = performance.now(), dur = 1600;
+    const tick = t => { const k = Math.min(1, (t - t0) / dur); el.textContent = Math.round(LINES * k); bar.style.width = (k * 100) + "%"; if (k < 1) anim = requestAnimationFrame(tick); };
+    anim = requestAnimationFrame(tick);
+  }
+
+  function setAnswers() {
+    const ra = document.getElementById("r-ans"), sa = document.getElementById("s-ans");
+    const show = step >= 5;
+    ra.classList.toggle("on", show); sa.classList.toggle("on", show);
+    if (!show) { ra.innerHTML = sa.innerHTML = '<div class="num">?</div><div>Answer</div>'; return; }
+    const r = raw(lagOn ? 7 : 0), moved = lagOn && r !== raw(0);
+    ra.innerHTML = `<div class="num${moved ? " moved" : ""}">${M(r)}</div><div>Called it net revenue. Named no owner. Also offered $9.6M and $11.6M.</div>`;
+    sa.innerHTML = `<div class="num">${M(net)}</div><div>Net sales, owner CFO. Demand, the Chief Merchant's number, is ${M(demand)}. Gap: ${M(demand - net)}.</div>`;
+  }
+
+  function render(animate) {
+    document.getElementById("n").textContent = `Step ${step + 1} of ${STEPS.length} · ${TITLES[step]}`;
+    document.getElementById("say").textContent = STEPS[step];
+    [...dots.children].forEach((d, k) => d.classList.toggle("on", k <= step));
+    document.getElementById("back").disabled = step === 0;
+    document.getElementById("next").disabled = step === STEPS.length - 1;
+
+    document.getElementById("r-wire").classList.toggle("live", step >= 1);
+    document.getElementById("s-wire").classList.toggle("live", step >= 1);
+    document.querySelectorAll("#r-files .file").forEach(f => {
+      f.classList.toggle("read", step >= 1);
+      f.classList.toggle("pick", step >= 1 && f.dataset.f === "inv");
+    });
+    document.querySelectorAll(".note").forEach(n => {
+      const on = step + 1 >= +n.dataset.s;
+      if (on && !n.classList.contains("show")) { n.classList.add("show"); requestAnimationFrame(() => requestAnimationFrame(() => n.classList.add("in"))); }
+      if (!on) n.classList.remove("show", "in");
+    });
+    document.querySelectorAll(".piece").forEach(p => {
+      const s = +p.dataset.s - 1;
+      p.classList.toggle("now", step === s);
+      p.classList.toggle("done", step > s);
+    });
+    const code = document.getElementById("r-code");
+    code.classList.toggle("show", step >= 4);
+    if (step === 4) countLines(animate); else if (step > 4) countLines(false);
+    document.getElementById("whatif").classList.toggle("show", step === 6);
+    if (step !== 6 && lagOn) setLag(false);
+    setAnswers();
+  }
+
+  function setLag(on) {
+    lagOn = on;
+    const b = document.getElementById("lag");
+    b.setAttribute("aria-pressed", on);
+    b.textContent = on ? "Bill on the ship date again" : "Bill a week after shipping";
+    const slid = sum(inv.filter(i => inQ(ship(i)) && !inQ(plus(ship(i), 7))), i => +i.amount);
+    document.getElementById("lag-say").textContent = on
+      ? `Raw files drops to ${M(raw(7))}: its recipe follows the invoice date, so ${K(slid)} shipped in late September slid into Q4. Semantic layer stays at ${M(net)}: the card counts on the ship date.`
+      : "Same orders, same shipments. Only the invoice dates move.";
+    setAnswers();
+  }
+
+  document.getElementById("next").addEventListener("click", () => { if (step < STEPS.length - 1) { step++; render(true); } });
+  document.getElementById("back").addEventListener("click", () => { if (step > 0) { step--; render(false); } });
+  document.getElementById("restart").addEventListener("click", () => { step = 0; setLag(false); render(false); });
+  document.getElementById("lag").addEventListener("click", () => setLag(!lagOn));
+  document.addEventListener("keydown", e => {
+    if (e.target.tagName === "BUTTON") return;
+    if (e.key === "ArrowRight") document.getElementById("next").click();
+    if (e.key === "ArrowLeft") document.getElementById("back").click();
+  });
+  render(false);
+  window.__test = { raw, net, demand, returns, billedOnShip, go: n => { step = n; render(false); }, setLag };
+})();
+</script>
+</body>
+</html>
